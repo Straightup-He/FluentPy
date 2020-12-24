@@ -32,3 +32,58 @@ print(fp.read(60))  # 报错 ValueError: I/O operation on closed file.
 ```
 
 **不管控制流程以哪种方式退出 with 块，都会在上下文管理器对象上调用 exit 方法，而不是在 enter 方法返回的对象上调用。**
+
+LookingGlass 上下文管理器类的代码
+
+```python
+class LookingGlass:
+    def __enter__(self):
+        import sys
+        self.original_write = sys.stdout.write
+        sys.stdout.write = self.reverse_write  # 猴子补丁
+        return 'JABBERWOCKY'
+
+    def reverse_write(self, text):
+        self.original_write(text[::-1])
+
+    def __exit__(self, exc_type, exc_val, traceback):
+        import sys
+        sys.stdout.write = self.original_write
+        if exc_type is ZeroDivisionError:
+            print('Please DO NOT divide by zero!')
+            return True
+
+# 测试
+with LookingGlass() as what:
+    print('Alice, Kitty and Snowdrop')
+    print(what)
+"""
+pordwonS dna yttiK ,ecilA
+YKCOWREBBAJ
+"""
+print(what)  # JABBERWOCKY
+```
+
+传给 __exit__ 方法的三个参数:
+
++ 异常类	    exc_type
++ 异常实例    exc_value
++ traceback对象
+
+```python
+# --------------- 在with块以外的地方测试 ---------------
+# 实例化并审查 manager 实例
+manager = LookingGlass()
+print(manager)   # <__main__.LookingGlass object at 0x00000000020C24A8>
+
+# 在上下文管理器上调用 __enter__() 方法
+monster = manager.__enter__()
+print(monster == 'JABBERWOCKY')  # eurT
+print(monster)                   # YKCOWREBBAJ
+print(manager)    # >0D16302000000000x0 ta tcejbo ssalGgnikooL.__niam__<
+
+# 调用 manager.__exit__，还原成之前的 stdout.write
+manager.__exit__(None, None, None)
+print(monster)    # JABBERWOCKY
+```
+
