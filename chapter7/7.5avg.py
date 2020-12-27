@@ -52,7 +52,6 @@ def make_averager():
     def averager(new_value):
         nonlocal count, total
         count += 1
-        total += 1
         total += new_value
         return total/count
     return averager
