@@ -289,17 +289,151 @@ def demo_finally():
             print('-> coroutine ending...')
 ```
 
+# 让协程返回值
 
+计算平均移动值（返回累计值，而不是每次都产出）
 
+```python
+from collections import namedtuple
 
+Result = namedtuple('Result', 'count average')
 
+def averager():
+    total = 0.0
+    count = 0
+    average = None
+    while True:
+        term = yield
+        if term is None:
+            break
+        total += term
+        count += 1
+        average = total / count
+    return Result(count, average)
 
+# 测试
+coro_avg = averager()
+next(coro_avg)
+coro_avg.send(10)
+coro_avg.send(30)
+coro_avg.send(6.5)
+"""
+# 普通版，返回值在异常中显示
+coro_avg.send(None)
 
+Traceback (most recent call last):
+  ...
+StopIteration: Result(count=3, average=15.5)
+"""
+# 捕获异常版
+try:
+    coro_avg.send(None)
+except StopIteration as exc:
+    result = exc.value
+print(result)   # Result(count=3, average=15.5)
+```
 
+# 使用 yield from
 
+yield from 可用于简化 for 循环中的 yield 表达式
 
+```python
+def gen():
+    for c in 'AB':
+        yield c
+    for i in range(1, 3):
+        yield i
+# 等价于
+def gen():
+    yield from 'AB'
+    yield from range(1, 3)
 
+# 还能这样
+def chain(*iterables):
+    for it in iterables:
+        yield from it
+s = 'ABC'
+t = tuple(range(3))
+list(chain(s, t))  # --> ['A', 'B', 'C', 0, 1, 2]
+```
 
+**yield from x 表达式对 x 对象做的第一件事：调用 iter(x) 获取迭代器。因此，x 可以是任何可迭代对象！**
+
+**yield from** 的主要功能是打开**双向通道**，把==最外层的调用方法==与==最内层的子生成器==连接起来，这样二者可以直接发送和产出值，还可以直接传入异常，而不用在位于中间的协程中添加处理异常的代码！
+
+**yield from 结构的几个专业术语：**
+
++ 委派生成器：包含 yield from <iterable> 表达式的生成器函数
++ 子生成器：从 yield from <iterable> 表达式获取的生成器
++ 调用方：调用委派生成器的客户端代码（委派生成器也是调用方，它调用了子生成器）
+
+使用 yield from 计算平均值并输出统计报告：
+
+```python
+from collections import namedtuple
+
+Result = namedtuple('Result', 'count average')
+
+# 子生成器
+def averager():
+    total = 0.0
+    count = 0
+    average = None
+    while True:
+        term = yield
+        if term is None:
+            break
+        total += term
+        count += 1
+        average = total / count
+    return Result(count, average)
+
+# 委派生成器
+def grouper(results, key):
+    while True:
+        results[key] = yield from averager()
+
+#客户端代码，即调用方
+def main(data):
+    results = {}
+    for key, values in data.items():
+        group = grouper(results, key)
+        next(group)
+        for value in values:
+            group.send(value)
+        group.send(None)
+    print(results)
+    report(results)
+
+# 输出报告
+def report(results):
+    for key, result in sorted(results.items()):
+        group, unit = key.split(';')
+        print('{:2} {:5} averaging {:.2f}{}'.format(
+            result.count, group, result.average, unit
+        ))
+
+data = {
+    'girls;kg':
+        [40.9, 38.5, 44.3, 42.2, 45.3, 41.7],
+    'girls;m':
+        [1.6, 1.51, 1.4, 1.3, 1.41, 1.39],
+    'boys;kg':
+        [39.0, 40.8, 43.2, 40.8, 43.3, 41.4],
+    'boys;m':
+        [1.38, 1.5, 1.32, 1.25, 1.37, 1.48],
+}
+
+if __name__ == '__main__':
+    main(data)
+"""
+{'girls;kg': Result(count=6, average=42.15), 'girls;m': Result(count=6, average=1.4349999999999998), 'boys;kg': Result(count=6, average=41.41666666666667), 'boys;m': Result(count=6, average=1.3833333333333335)}
+ 6 boys  averaging 41.42kg
+ 6 boys  averaging 1.38m
+ 6 girls averaging 42.15kg
+ 6 girls averaging 1.43m
+"""
+```
 
 
 
