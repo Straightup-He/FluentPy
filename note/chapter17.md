@@ -87,7 +87,7 @@ if __name__ == '__main__':
 # download_one 函数其实是 flag.py 中 download_many 函数的 for 循环体。编写并发代码时经常这样重构：把依序执行的 for 循环体改成函数，以便并发调用
 ```
 
-使用concurrent.futures模块下载（用 submit 和 as_completed 函数替换 map 函数）：
+使用concurrent.futures模块下载（用 executor.submit 和 futures.as_completed 函数替换 executor.map 函数）：
 
 ```python
 from concurrent import futures
@@ -129,6 +129,7 @@ def download_many(cc_list):
 if __name__ == '__main__':
     main(download_many)
 
+# 更加灵活，executor.submit 和 futures.as_completed 方法能处理不同的可调用对象和参数，而 executor.map 只能处理参数不同的同一个可调用对象
 ```
 
 
